@@ -1,0 +1,9 @@
+# Front controller: todo lo que no sea un archivo/directorio real se enruta a index.php,
+# que hace su propio switch sobre REQUEST_URI (ver public/index.php).
+RewriteEngine On
+
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+RewriteRule ^ index.php [L]

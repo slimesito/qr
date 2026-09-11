@@ -1,0 +1,39 @@
+# Desarrollo local únicamente. En producción no se usa: EasyPanel construye el
+# Dockerfile por su cuenta e inyecta las variables de entorno desde su panel.
+#
+# La base **no** está acá: se reutiliza el contenedor `postgres-18` que ya vive
+# en la máquina (ver "Desarrollo local" en CLAUDE.md). Por eso el único servicio
+# es la app.
+
+services:
+  app:
+    build: .
+    # El 80 del host ya está ocupado por otra cosa, así que la app va al 8080.
+    # Adentro del contenedor sigue siendo el 80 que expone el Dockerfile.
+    ports:
+      - "8080:80"
+
+    # Montar el repo sobre el código horneado en la imagen: se edita un .php y
+    # el request siguiente ya lo sirve, sin rebuild. Efecto secundario esperado:
+    # tapa /var/www/html/.build, así que el pie del panel sale sin sello de
+    # deploy (Layouts/app.php lo lee con @file_get_contents, degrada solo).
+    #
+    # Es además lo que le deja el .env al parser de public/index.php, que lo
+    # busca en BASE_PATH -o sea /var/www/html/.env, no en public/.
+    volumes:
+      - .:/var/www/html
+
+    # `postgres-18` corre en la red bridge por defecto, donde Docker **no**
+    # resuelve nombres de contenedor: ponerle DB_HOST=postgres-18 no conectaría.
+    # La vía estable es el gateway del host contra el puerto que ese contenedor
+    # publica (5433), y eso es lo que apunta el DB_HOST del .env.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    restart: unless-stopped
+
+# A propósito no hay `environment:` ni `env_file:`: los valores viven sólo en el
+# .env que monta el volumen de arriba. Duplicarlos acá abriría un caso borde del
+# parser de public/index.php -una variable presente pero vacía en el entorno del
+# proceso le gana al .env, porque getenv() devuelve "" y no false-, y entonces
+# config/database.php aborta con 500 diciendo que falta.
